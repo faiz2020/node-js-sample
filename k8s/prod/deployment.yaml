@@ -1,4 +1,4 @@
-﻿apiVersion: apps/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: nodejs-app
@@ -15,6 +15,6 @@ spec:
     spec:
       containers:
       - name: nodejs-app
-        image: faiz792/nodejs-app:latest
+        image: faiz792/nodejs-app:IMAGE_TAG_PLACEHOLDER
         ports:
         - containerPort: 5000

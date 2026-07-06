@@ -1,0 +1,51 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.vars.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: vars
+        run: echo "image_tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        run: |
+          docker build -t faiz792/nodejs-app:${{ steps.vars.outputs.image_tag }} .
+          docker push faiz792/nodejs-app:${{ steps.vars.outputs.image_tag }}
+
+  deploy-staging:
+    needs: build-and-push
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to staging
+        run: |
+          sed "s|IMAGE_TAG_PLACEHOLDER|${{ needs.build-and-push.outputs.image_tag }}|g" k8s/staging/deployment.yaml > /tmp/staging-deployment.yaml
+          kubectl apply -f /tmp/staging-deployment.yaml
+          kubectl apply -f k8s/staging/service.yaml
+
+  deploy-prod:
+    needs: [build-and-push, deploy-staging]
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to prod
+        run: |
+          sed "s|IMAGE_TAG_PLACEHOLDER|${{ needs.build-and-push.outputs.image_tag }}|g" k8s/prod/deployment.yaml > /tmp/prod-deployment.yaml
+          kubectl apply -f /tmp/prod-deployment.yaml
+          kubectl apply -f k8s/prod/service.yaml
